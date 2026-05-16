@@ -1,6 +1,6 @@
 import logging
 import re
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
 
@@ -15,6 +15,14 @@ CHAPTER_NUM_PATTERNS = [
     re.compile(r"(\d+)\s*[\.、．\s]"),  # 1., 2、
     re.compile(r"^(\d+)$"),  # standalone number
 ]
+
+# Common navigation/non-chapter title patterns to filter out
+NAV_TITLES = re.compile(
+    r"^(首頁|主頁|下一章|上一章|目錄|返回|首页|主页|关于|關於|联系|聯繫|"
+    r"登錄|登录|注册|註冊|搜索|收藏|推薦|推荐|設置|设置|幫助|帮助|"
+    r"copyright|about|privacy|contact|home|bookmark|share|"
+    r"更多|more|閱讀全文|阅读全文)$", re.I
+)
 
 
 def extract_chapter_num(title):
@@ -100,6 +108,32 @@ def parse_catalog(url, selector=None, session=None, auto_sort=True, url_pattern=
         # Apply URL pattern filter if provided
         if url_regex and not url_regex.search(clean_url):
             continue
+
+        # Default heuristic filters (only when no selector/pattern explicitly given)
+        if not selector and not url_pattern:
+            # Skip links to external domains
+            if not utils.is_same_domain(clean_url, url):
+                continue
+            # Skip navigation links with common site page titles
+            if NAV_TITLES.match(title):
+                continue
+            # Skip links with very short URL paths (like "/" or "/about.html")
+            path = urlparse(clean_url).path.rstrip("/")
+            if len(path) < 5:
+                continue
+            # Skip category/list/tag/search pages (not chapter links)
+            if re.search(r"/(list|category|tag|author|search)/", path, re.I):
+                continue
+            # Skip links that only have a single numeric segment (book pages, not chapters)
+            # Chapter URLs typically have multiple numeric segments like /books/126972/12345.html
+            numeric_segments = [s for s in path.split("/") if s.rstrip(".html").isdigit()]
+            if numeric_segments and len(numeric_segments) < 2:
+                continue
+            # Skip shallow paths (e.g. /about.html, /copyright.html) — real chapters
+            # typically have deeper paths like /books/126972/25566759.html
+            path_segments = [s for s in path.split("/") if s]
+            if len(path_segments) < 2:
+                continue
 
         chapters.append({"title": title, "url": clean_url})
         seen_urls.add(clean_url)

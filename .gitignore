@@ -13,6 +13,9 @@ venv/
 epub_generator/downloads/
 epub_generator/static/
 
+# Testing artifacts
+.playwright-mcp/
+
 # OS
 .DS_Store
 Thumbs.db
