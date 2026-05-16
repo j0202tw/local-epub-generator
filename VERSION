@@ -1,14 +1,10 @@
-VERSION 1.0
+VERSION 1.1
 Date: 2026-05-16
 Status: Released
 
 Changelog:
-- Initial release of EPUB local generation tool
-- Web interface with Flask (generation + probe tool tabs)
-- Catalog parser with CSS selector support and auto chapter number sorting
-- Chapter fetcher with HTML cleaning, title extraction (priority: <title> > <h1> > fallback), title cleanup
-- EPUB 3 builder via ebooklib with TOC navigation
-- Multi-threaded chapter fetching with progress tracking
-- Probe/detection tool for finding CSS selectors
-- Title extraction fix: prefer <title> over site logo <h1>
-- Sort fix: chapters ordered by catalog sequence after parallel fetch
+- Improved heuristic filters: skip category/list/tag pages, shallow paths, single-numeric-segment URLs, navigation titles
+- Removed inline style/class/presentation attributes from chapter HTML to fix EPUB reader font scaling
+- Persisted completed task metadata to disk so downloads survive server restarts
+- Added URL pattern filter support for catalog parsing
+- Fixed chapter order sorting after parallel fetch
