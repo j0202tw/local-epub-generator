@@ -129,6 +129,13 @@ def clean_html(elem):
         if tag.name not in KEEP_TAGS:
             tag.unwrap()
 
+    # Strip presentation attributes so EPUB reader font/size controls work
+    REMOVE_ATTRS = {"style", "class", "id", "width", "height", "align", "valign",
+                    "bgcolor", "color", "cellpadding", "cellspacing", "border"}
+    for tag in elem.find_all():
+        for attr in REMOVE_ATTRS:
+            tag.attrs.pop(attr, None)
+
     return elem
 
 

@@ -27,6 +27,7 @@ app.secret_key = os.urandom(24).hex()
 TASKS = {}
 TASKS_LOCK = threading.Lock()
 DOWNLOAD_DIR = os.path.join(os.path.dirname(__file__), "downloads")
+TASKS_FILE = os.path.join(DOWNLOAD_DIR, "tasks.json")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 
@@ -39,6 +40,65 @@ def cleanup_old_temp(max_age_hours=1):
             age_hours = (now - os.path.getmtime(path)) / 3600
             if age_hours > max_age_hours:
                 shutil.rmtree(path, ignore_errors=True)
+    # Also prune stale entries from persisted tasks
+    _prune_stale_tasks()
+
+
+def _save_tasks():
+    """Persist completed task metadata to disk so downloads survive restarts."""
+    with TASKS_LOCK:
+        serializable = {}
+        for tid, t in TASKS.items():
+            if t["status"] in ("completed", "error"):
+                entry = {
+                    "id": t["id"],
+                    "status": t["status"],
+                    "title": t["title"],
+                    "author": t["author"],
+                    "progress": t["progress"],
+                    "output_path": t.get("output_path"),
+                    "error": t.get("error"),
+                }
+                serializable[tid] = entry
+    try:
+        with open(TASKS_FILE, "w", encoding="utf-8") as f:
+            json.dump(serializable, f, ensure_ascii=False)
+    except Exception as e:
+        logger.warning("Failed to save tasks: %s", e)
+
+
+def _load_tasks():
+    """Load persisted tasks from disk on startup."""
+    if not os.path.exists(TASKS_FILE):
+        return
+    try:
+        with open(TASKS_FILE, "r", encoding="utf-8") as f:
+            loaded = json.load(f)
+        with TASKS_LOCK:
+            for tid, entry in loaded.items():
+                if tid not in TASKS and os.path.exists(entry.get("output_path", "")):
+                    entry["dir"] = os.path.dirname(entry["output_path"])
+                    TASKS[tid] = entry
+    except Exception as e:
+        logger.warning("Failed to load tasks: %s", e)
+
+
+def _prune_stale_tasks():
+    """Remove persisted tasks whose output files no longer exist."""
+    if not os.path.exists(TASKS_FILE):
+        return
+    try:
+        with open(TASKS_FILE, "r", encoding="utf-8") as f:
+            loaded = json.load(f)
+        stale = [tid for tid, entry in loaded.items()
+                 if not os.path.exists(entry.get("output_path", ""))]
+        if stale:
+            for tid in stale:
+                loaded.pop(tid, None)
+            with open(TASKS_FILE, "w", encoding="utf-8") as f:
+                json.dump(loaded, f, ensure_ascii=False)
+    except Exception as e:
+        logger.warning("Failed to prune stale tasks: %s", e)
 
 
 # ─── Probe / Detection Tool ─────────────────────────────────────────
@@ -207,6 +267,7 @@ def _run_generation(task_id, title, author, catalog_url, catalog_selector, conte
         if not chapters:
             task["status"] = "error"
             task["error"] = "無法從目錄頁解析到任何章節"
+            _save_tasks()
             return
 
         total = len(chapters)
@@ -249,6 +310,7 @@ def _run_generation(task_id, title, author, catalog_url, catalog_selector, conte
         if not fetched_chapters:
             task["status"] = "error"
             task["error"] = "所有章節抓取失敗"
+            _save_tasks()
             return
 
         # Step 3: Sort by catalog order (catalog is already sorted by chapter number)
@@ -275,11 +337,13 @@ def _run_generation(task_id, title, author, catalog_url, catalog_selector, conte
 
         task["status"] = "completed"
         task["output_path"] = epub_path
+        _save_tasks()
 
     except Exception as e:
         logger.exception("Task %s failed: %s", task_id, e)
         task["status"] = "error"
         task["error"] = str(e)
+        _save_tasks()
 
 
 # ─── Task Status / Download ─────────────────────────────────────────
@@ -348,5 +412,6 @@ def catalog_preview():
 
 if __name__ == "__main__":
     cleanup_old_temp()
+    _load_tasks()
     logger.info("Starting EPUB Generator on http://127.0.0.1:5000")
     app.run(host="127.0.0.1", port=5000, debug=True, threaded=True)
