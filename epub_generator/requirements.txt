@@ -1,0 +1,7 @@
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=5.0.0
+ebooklib>=0.18
+chardet>=5.2.0
+Flask>=3.0.0
+Pillow>=10.0.0

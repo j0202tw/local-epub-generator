@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPUB 電子書生成工具</title>
+    <style>
+        :root {
+            --bg: #f5f5f7;
+            --card: #fff;
+            --border: #d2d2d7;
+            --primary: #0071e3;
+            --primary-hover: #0077ed;
+            --text: #1d1d1f;
+            --text-secondary: #6e6e73;
+            --success: #30b94d;
+            --danger: #ff3b30;
+            --radius: 12px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        h1 {
+            text-align: center;
+            font-size: 1.8em;
+            font-weight: 700;
+            margin: 30px 0 8px;
+        }
+        .subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            margin-bottom: 30px;
+            font-size: 0.9em;
+        }
+        .card {
+            background: var(--card);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,.08);
+            border: 1px solid var(--border);
+        }
+        .card h2 {
+            font-size: 1.15em;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+        .form-group { margin-bottom: 14px; }
+        label {
+            display: block;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: var(--text-secondary);
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.95em;
+            background: #fff;
+            transition: border-color .2s;
+        }
+        input:focus, textarea:focus { outline: none; border-color: var(--primary); }
+        textarea { resize: vertical; min-height: 60px; font-family: inherit; }
+        .hint { font-size: 0.8em; color: var(--text-secondary); margin-top: 3px; }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .2s;
+        }
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+        .btn-secondary { background: #e8e8ed; color: var(--text); }
+        .btn-secondary:hover { background: #dcdce0; }
+
+        .row { display: flex; gap: 12px; }
+        .row .form-group { flex: 1; }
+        .row .form-group:last-child { flex: 0 0 100px; }
+
+        .probe-result { margin-top: 12px; }
+        .probe-result h3 { font-size: 0.9em; margin-bottom: 6px; }
+        .selector-item {
+            padding: 10px;
+            margin-bottom: 6px;
+            border-radius: 6px;
+            background: #f8f8fa;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: all .15s;
+        }
+        .selector-item:hover { border-color: var(--primary); }
+        .selector-item.found { border-left: 3px solid var(--success); }
+        .selector-item .sel-name {
+            font-family: "SF Mono", Monaco, monospace;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        .selector-item .sel-desc {
+            font-size: 0.8em;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+        .selector-item .sel-preview {
+            font-size: 0.8em;
+            margin-top: 6px;
+            padding: 6px;
+            background: #fff;
+            border-radius: 4px;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+        .structure-item {
+            padding: 8px 10px;
+            border-bottom: 1px solid #eee;
+            font-size: 0.85em;
+        }
+        .structure-item:last-child { border-bottom: none; }
+        .structure-item .tag { font-family: monospace; color: var(--primary); }
+        .structure-item .len { color: var(--text-secondary); margin: 0 8px; }
+
+        .progress-bar {
+            height: 6px;
+            background: #e8e8ed;
+            border-radius: 3px;
+            margin: 12px 0;
+            overflow: hidden;
+        }
+        .progress-bar .fill {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 3px;
+            transition: width .5s ease;
+            width: 0;
+        }
+        .status-text { font-size: 0.9em; }
+        .status-text.error { color: var(--danger); }
+        .status-text.success { color: var(--success); }
+
+        .download-link {
+            display: inline-block;
+            margin-top: 12px;
+            padding: 12px 24px;
+            background: var(--success);
+            color: #fff;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+        .download-link:hover { opacity: .9; }
+
+        .tab-bar { display: flex; gap: 0; margin-bottom: 0; border-bottom: 1px solid var(--border); }
+        .tab-bar button {
+            padding: 10px 20px;
+            border: none;
+            background: none;
+            font-size: 0.9em;
+            cursor: pointer;
+            color: var(--text-secondary);
+            border-bottom: 2px solid transparent;
+            transition: all .2s;
+        }
+        .tab-bar button.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            font-weight: 600;
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .catalog-preview-list {
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 0.85em;
+            margin-top: 8px;
+        }
+        .catalog-preview-list li {
+            padding: 4px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px; height: 16px;
+            border: 2px solid rgba(255,255,255,.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin .6s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 600px) {
+            .container { padding: 12px; }
+            .row { flex-direction: column; }
+            .row .form-group:last-child { flex: 1; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📖 EPUB 電子書生成工具</h1>
+    <p class="subtitle">輸入目錄網址，自動抓取章節內容並生成 EPUB 電子書</p>
+
+    <!-- Tabs -->
+    <div class="card" style="padding:0;">
+        <div class="tab-bar">
+            <button class="active" data-tab="generate">生成電子書</button>
+            <button data-tab="probe">探測工具</button>
+        </div>
+
+        <!-- Tab 1: Generate -->
+        <div id="tab-generate" class="tab-content active" style="padding:24px;">
+            <div class="form-group">
+                <label>書名</label>
+                <input type="text" id="book-title" placeholder="例如：三體">
+            </div>
+            <div class="form-group">
+                <label>作者</label>
+                <input type="text" id="book-author" placeholder="例如：劉慈欣">
+            </div>
+            <div class="form-group">
+                <label>目錄頁網址</label>
+                <input type="url" id="catalog-url" placeholder="https://example.com/toc">
+                <div class="hint">包含所有章節連結的目錄頁面 URL</div>
+            </div>
+            <div class="form-group">
+                <label>目錄連結選擇器（選填）</label>
+                <input type="text" id="catalog-selector" placeholder="例如：.chapter-list a">
+                <div class="hint">CSS 選擇器，用於精確定位目錄中的章節連結</div>
+            </div>
+            <div class="form-group">
+                <label>正文選擇器（選填）</label>
+                <input type="text" id="content-selector" placeholder="例如：#content 或 .chapter-body">
+                <div class="hint">可用下方「探測工具」找出正確的選擇器</div>
+            </div>
+            <div class="row">
+                <div class="form-group">
+                    <label>同時抓取線程數</label>
+                    <input type="number" id="max-threads" value="5" min="1" max="20">
+                </div>
+                <div class="form-group" style="display:flex;align-items:flex-end;">
+                    <button class="btn btn-secondary" id="preview-catalog-btn" style="width:100%;">預覽目錄</button>
+                </div>
+            </div>
+            <button class="btn btn-primary" id="generate-btn" style="width:100%;justify-content:center;">開始生成 EPUB</button>
+
+            <!-- Catalog preview -->
+            <div id="catalog-preview" class="probe-result" style="display:none;">
+                <h3>📑 目錄預覽</h3>
+                <p id="catalog-count" style="font-size:0.85em;color:var(--text-secondary);"></p>
+                <ul id="catalog-list" class="catalog-preview-list"></ul>
+            </div>
+
+            <!-- Progress -->
+            <div id="progress-area" style="display:none;margin-top:16px;">
+                <div class="progress-bar"><div class="fill" id="progress-fill"></div></div>
+                <p class="status-text" id="status-text">初始化...</p>
+                <div id="download-area"></div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Probe Tool -->
+        <div id="tab-probe" class="tab-content" style="padding:24px;">
+            <p style="font-size:0.85em;color:var(--text-secondary);margin-bottom:12px;">
+                輸入任意章節網址，工具將自動嘗試常見的正文選擇器並顯示頁面結構，幫助您找到合適的 CSS 選擇器。
+            </p>
+            <div class="form-group">
+                <label>章節網址</label>
+                <input type="url" id="probe-url" placeholder="https://example.com/chapter/1">
+            </div>
+            <div class="form-group">
+                <label>手動指定選擇器（選填）</label>
+                <input type="text" id="probe-selector" placeholder="例如：#chapter-content">
+            </div>
+            <button class="btn btn-primary" id="probe-btn">探測內容</button>
+            <div id="probe-result" class="probe-result" style="display:none;"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+const TAB = document.querySelector('.tab-bar');
+TAB.addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+});
+
+// ─── Probe Tool ─────────────────────────────────────────────────────
+
+let lastProbeResult = null;
+
+document.getElementById('probe-btn').addEventListener('click', async () => {
+    const url = document.getElementById('probe-url').value.trim();
+    const selector = document.getElementById('probe-selector').value.trim();
+    if (!url) { alert('請輸入章節網址'); return; }
+
+    const btn = document.getElementById('probe-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> 探測中...';
+
+    const resultDiv = document.getElementById('probe-result');
+    resultDiv.style.display = 'none';
+
+    try {
+        const resp = await fetch('/probe', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ url, selector }),
+        });
+        const data = await resp.json();
+        if (data.error) { alert(data.error); return; }
+
+        lastProbeResult = url;
+        renderProbeResult(data, selector);
+    } catch (e) {
+        alert('請求失敗: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '探測內容';
+    }
+});
+
+function renderProbeResult(data, userSelector) {
+    const div = document.getElementById('probe-result');
+    div.style.display = 'block';
+
+    let html = `<p style="font-size:0.85em;color:var(--text-secondary);margin-bottom:8px;">
+        頁面編碼: <strong>${data.encoding}</strong> | 大小: ${(data.page_size / 1024).toFixed(1)} KB
+    </p>`;
+
+    // Found selectors
+    const found = Object.entries(data.selectors).filter(([, v]) => v.found);
+    if (found.length > 0) {
+        html += '<h3>✅ 可用選擇器（點擊選用）</h3>';
+        for (const [sel, info] of found) {
+            const isUser = sel === userSelector;
+            html += `<div class="selector-item found" onclick="selectContentSelector('${sel}')">
+                <div class="sel-name">${isUser ? '⭐ ' : ''}${sel}</div>
+                <div class="sel-desc">匹配文字長度: ${info.text_length} 字元</div>
+                <div class="sel-preview">${escHtml(info.text_preview)}</div>
+            </div>`;
+        }
+    } else {
+        html += '<p style="color:var(--danger);">未找到自動匹配的選擇器，請參考下方頁面結構手動指定。</p>';
+    }
+
+    // Page structure
+    if (data.structure && data.structure.length > 0) {
+        html += '<h3 style="margin-top:12px;">🔍 頁面內容區塊結構</h3>';
+        for (const item of data.structure) {
+            html += `<div class="structure-item">
+                <span class="tag">${escHtml(item.tag)}</span>
+                <span class="len">${item.text_length} 字元</span>
+                <span style="color:var(--text-secondary);">${escHtml(item.text_preview)}</span>
+            </div>`;
+        }
+    }
+
+    div.innerHTML = html;
+}
+
+function selectContentSelector(sel) {
+    document.getElementById('content-selector').value = sel;
+    // Switch to generate tab
+    document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelector('[data-tab="generate"]').classList.add('active');
+    document.getElementById('tab-generate').classList.add('active');
+
+    // Scroll to catalog URL
+    document.getElementById('catalog-url').focus();
+}
+
+function escHtml(s) {
+    if (!s) return '';
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+// ─── Catalog Preview ────────────────────────────────────────────────
+
+document.getElementById('preview-catalog-btn').addEventListener('click', async () => {
+    const url = document.getElementById('catalog-url').value.trim();
+    const selector = document.getElementById('catalog-selector').value.trim();
+    if (!url) { alert('請輸入目錄網址'); return; }
+
+    const btn = document.getElementById('preview-catalog-btn');
+    btn.disabled = true;
+    btn.textContent = '解析中...';
+
+    try {
+        const resp = await fetch('/catalog-preview', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ url, selector }),
+        });
+        const data = await resp.json();
+        if (data.error) { alert(data.error); return; }
+
+        const div = document.getElementById('catalog-preview');
+        div.style.display = 'block';
+        document.getElementById('catalog-count').textContent = `共 ${data.total} 個章節（顯示前 ${Math.min(100, data.total)} 個）`;
+        const list = document.getElementById('catalog-list');
+        list.innerHTML = data.chapters.map((c, i) =>
+            `<li>${i + 1}. <strong>${escHtml(c.title)}</strong> <span style="color:var(--text-secondary);font-size:0.9em;">${escHtml(c.url)}</span></li>`
+        ).join('');
+    } catch (e) {
+        alert('請求失敗: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '預覽目錄';
+    }
+});
+
+// ─── Generate EPUB ──────────────────────────────────────────────────
+
+let pollTimer = null;
+
+document.getElementById('generate-btn').addEventListener('click', async () => {
+    const title = document.getElementById('book-title').value.trim();
+    const author = document.getElementById('book-author').value.trim();
+    const catalogUrl = document.getElementById('catalog-url').value.trim();
+    const catalogSelector = document.getElementById('catalog-selector').value.trim();
+    const contentSelector = document.getElementById('content-selector').value.trim();
+    const maxThreads = document.getElementById('max-threads').value;
+
+    if (!title || !author || !catalogUrl) {
+        alert('請填寫書名、作者和目錄網址');
+        return;
+    }
+
+    const btn = document.getElementById('generate-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> 生成中...';
+
+    const progressArea = document.getElementById('progress-area');
+    progressArea.style.display = 'block';
+    document.getElementById('download-area').innerHTML = '';
+    updateProgress(0, '正在提交任務...');
+
+    try {
+        const resp = await fetch('/generate', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ title, author, catalog_url: catalogUrl, catalog_selector: catalogSelector, content_selector: contentSelector, max_threads: parseInt(maxThreads) }),
+        });
+        const data = await resp.json();
+        if (data.error) { alert(data.error); return; }
+
+        pollTimer = setInterval(() => pollStatus(data.task_id), 800);
+    } catch (e) {
+        alert('提交失敗: ' + e.message);
+        btn.disabled = false;
+        btn.textContent = '開始生成 EPUB';
+    }
+});
+
+async function pollStatus(taskId) {
+    try {
+        const resp = await fetch('/status/' + taskId);
+        const data = await resp.json();
+        if (data.error) { clearInterval(pollTimer); return; }
+
+        const p = data.progress;
+        if (data.status === 'parsing_catalog') {
+            updateProgress(0, '正在解析目錄...');
+        } else if (data.status === 'fetching') {
+            const pct = p.total > 0 ? Math.round((p.completed / p.total) * 100) : 0;
+            updateProgress(pct, `正在抓取章節... ${p.completed}/${p.total}（失敗 ${p.failed}）`);
+        } else if (data.status === 'building') {
+            updateProgress(95, '正在生成 EPUB 檔案...');
+        } else if (data.status === 'completed') {
+            clearInterval(pollTimer);
+            updateProgress(100, '✅ 完成！');
+            document.getElementById('download-area').innerHTML =
+                `<a href="/download/${taskId}" class="download-link">⬇ 下載 EPUB</a>`;
+            document.getElementById('generate-btn').disabled = false;
+            document.getElementById('generate-btn').textContent = '開始生成 EPUB';
+        } else if (data.status === 'error') {
+            clearInterval(pollTimer);
+            updateProgress(0, '❌ ' + (data.error || '生成失敗'));
+            document.getElementById('status-text').className = 'status-text error';
+            document.getElementById('generate-btn').disabled = false;
+            document.getElementById('generate-btn').textContent = '重新生成';
+        }
+    } catch (e) {
+        // ignore poll errors
+    }
+}
+
+function updateProgress(pct, text) {
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('status-text').textContent = text;
+}
+</script>
+</body>
+</html>
