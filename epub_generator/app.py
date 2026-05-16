@@ -10,7 +10,7 @@ from datetime import datetime
 from flask import Flask, render_template, request, jsonify, send_file
 
 from core import utils
-from core.catalog_parser import parse_catalog
+from core.catalog_parser import parse_catalog, detect_url_pattern
 from core.chapter_fetcher import fetch_chapter
 from core.epub_builder import build_epub
 
@@ -402,9 +402,11 @@ def catalog_preview():
 
     try:
         chapters = parse_catalog(url, selector=selector, url_pattern=url_pattern)
+        detected_pattern = detect_url_pattern(chapters) if not url_pattern else None
         return jsonify({
             "total": len(chapters),
             "chapters": chapters[:100],  # limit preview
+            "detected_pattern": detected_pattern,
         })
     except Exception as e:
         return jsonify({"error": f"解析目錄失敗: {str(e)}"}), 400

@@ -431,6 +431,11 @@ document.getElementById('preview-catalog-btn').addEventListener('click', async (
         list.innerHTML = data.chapters.map((c, i) =>
             `<li>${i + 1}. <strong>${escHtml(c.title)}</strong> <span style="color:var(--text-secondary);font-size:0.9em;">${escHtml(c.url)}</span></li>`
         ).join('');
+
+        // Auto-fill detected URL pattern
+        if (data.detected_pattern) {
+            document.getElementById('url-pattern').value = data.detected_pattern;
+        }
     } catch (e) {
         alert('請求失敗: ' + e.message);
     } finally {
@@ -442,6 +447,7 @@ document.getElementById('preview-catalog-btn').addEventListener('click', async (
 // ─── Generate EPUB ──────────────────────────────────────────────────
 
 let pollTimer = null;
+let currentTaskId = null;
 
 document.getElementById('generate-btn').addEventListener('click', async () => {
     const title = document.getElementById('book-title').value.trim();
@@ -475,6 +481,7 @@ document.getElementById('generate-btn').addEventListener('click', async () => {
         const data = await resp.json();
         if (data.error) { alert(data.error); return; }
 
+        currentTaskId = data.task_id;
         pollTimer = setInterval(() => pollStatus(data.task_id), 800);
     } catch (e) {
         alert('提交失敗: ' + e.message);
@@ -501,7 +508,7 @@ async function pollStatus(taskId) {
             clearInterval(pollTimer);
             updateProgress(100, '✅ 完成！');
             document.getElementById('download-area').innerHTML =
-                `<a href="/download/${taskId}" class="download-link">⬇ 下載 EPUB</a>`;
+                `<button onclick="downloadEPUB()" class="download-link">⬇ 下載 EPUB</button>`;
             document.getElementById('generate-btn').disabled = false;
             document.getElementById('generate-btn').textContent = '開始生成 EPUB';
         } else if (data.status === 'error') {
@@ -519,6 +526,42 @@ async function pollStatus(taskId) {
 function updateProgress(pct, text) {
     document.getElementById('progress-fill').style.width = pct + '%';
     document.getElementById('status-text').textContent = text;
+}
+
+async function downloadEPUB() {
+    const taskId = currentTaskId;
+    if (!taskId) { alert('無可下載的任務'); return; }
+    try {
+        const resp = await fetch('/download/' + taskId);
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            alert('下載失敗: ' + (err.error || resp.statusText));
+            return;
+        }
+        const blob = await resp.blob();
+        // Extract filename from Content-Disposition header
+        let filename = 'book.epub';
+        const cd = resp.headers.get('Content-Disposition');
+        if (cd) {
+            const match = cd.match(/filename\*=UTF-8''([^;]+)/);
+            if (match) {
+                filename = decodeURIComponent(match[1]);
+            } else {
+                const fallback = cd.match(/filename=([^;]+)/);
+                if (fallback) filename = fallback[1].trim();
+            }
+        }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        alert('下載失敗: ' + e.message);
+    }
 }
 </script>
 </body>

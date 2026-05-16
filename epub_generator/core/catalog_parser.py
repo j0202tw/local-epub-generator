@@ -61,6 +61,63 @@ def sort_chapters(chapters):
     return sorted_chapters
 
 
+def detect_url_pattern(chapters):
+    """Auto-detect a URL regex pattern from chapter URLs.
+
+    Analyzes chapter URL paths and replaces varying numeric segments
+    with \\d+, producing a pattern like /books/123/\\d+\\.html.
+
+    Returns a regex pattern string, or empty string if undetectable.
+    """
+    if len(chapters) < 2:
+        return ""
+
+    # Use up to 100 chapters for pattern detection
+    paths = []
+    for ch in chapters[:100]:
+        path = urlparse(ch["url"]).path.rstrip("/")
+        paths.append(path)
+
+    tokenized = [p.split("/") for p in paths]
+    n = len(tokenized[0])
+    if not all(len(t) == n for t in tokenized):
+        return ""
+
+    pattern_parts = []
+    for i in range(n):
+        values = [t[i] for t in tokenized]
+        segment = values[0]
+
+        # Skip empty segment from leading "/"
+        if not segment and all(not v for v in values):
+            pattern_parts.append("")
+            continue
+
+        if len(set(values)) == 1:
+            # Same value across all chapters → literal
+            pattern_parts.append(re.escape(segment))
+        else:
+            # Varying segment — check if all values are numeric (with optional extension)
+            def strip_ext(s):
+                return s.rstrip(".html").rstrip(".htm") if s else s
+
+            stripped = [strip_ext(v) for v in values]
+            if all(s and s.isdigit() for s in stripped):
+                # Determine extension
+                ext = ""
+                for v in values:
+                    base = strip_ext(v)
+                    if base != v:
+                        ext = re.escape(v[len(base):])
+                        break
+                pattern_parts.append(r"\d+" + ext)
+            else:
+                return ""  # non-numeric variation → can't auto-detect
+
+    result = "/".join(pattern_parts)
+    return result
+
+
 def parse_catalog(url, selector=None, session=None, auto_sort=True, url_pattern=None):
     """Parse a catalog/TOC page and extract chapter links.
 
