@@ -53,13 +53,15 @@ def sort_chapters(chapters):
     return sorted_chapters
 
 
-def parse_catalog(url, selector=None, session=None, auto_sort=True):
+def parse_catalog(url, selector=None, session=None, auto_sort=True, url_pattern=None):
     """Parse a catalog/TOC page and extract chapter links.
 
     Args:
         url: The catalog page URL.
         selector: Optional CSS selector for chapter links (e.g. 'ul.chapter-list a').
         session: Optional requests session.
+        auto_sort: Whether to auto-sort chapters by number.
+        url_pattern: Optional regex pattern to filter chapter URLs.
 
     Returns:
         List of dicts: [{"title": str, "url": str}, ...]
@@ -70,6 +72,7 @@ def parse_catalog(url, selector=None, session=None, auto_sort=True):
 
     chapters = []
     seen_urls = set()
+    url_regex = re.compile(url_pattern) if url_pattern else None
 
     if selector:
         links = soup.select(selector)
@@ -92,6 +95,10 @@ def parse_catalog(url, selector=None, session=None, auto_sort=True):
         # Remove fragment for dedup
         clean_url = full_url.split("#")[0]
         if clean_url in seen_urls:
+            continue
+
+        # Apply URL pattern filter if provided
+        if url_regex and not url_regex.search(clean_url):
             continue
 
         chapters.append({"title": title, "url": clean_url})

@@ -157,6 +157,7 @@ def generate():
     catalog_url = data.get("catalog_url", "").strip()
     catalog_selector = data.get("catalog_selector", "").strip() or None
     content_selector = data.get("content_selector", "").strip() or None
+    url_pattern = data.get("url_pattern", "").strip() or None
     max_threads = int(data.get("max_threads", 5))
 
     if not all([title, author, catalog_url]):
@@ -183,7 +184,7 @@ def generate():
 
     thread = threading.Thread(
         target=_run_generation,
-        args=(task_id, title, author, catalog_url, catalog_selector, content_selector, max_threads, task_dir),
+        args=(task_id, title, author, catalog_url, catalog_selector, content_selector, url_pattern, max_threads, task_dir),
         daemon=True,
     )
     thread.start()
@@ -191,7 +192,7 @@ def generate():
     return jsonify({"task_id": task_id})
 
 
-def _run_generation(task_id, title, author, catalog_url, catalog_selector, content_selector, max_threads, task_dir):
+def _run_generation(task_id, title, author, catalog_url, catalog_selector, content_selector, url_pattern, max_threads, task_dir):
     """Background task: parse catalog, fetch chapters, build EPUB."""
     task = TASKS.get(task_id)
     if not task:
@@ -201,7 +202,7 @@ def _run_generation(task_id, title, author, catalog_url, catalog_selector, conte
         # Step 1: Parse catalog
         logger.info("Task %s: parsing catalog...", task_id)
         task["status"] = "parsing_catalog"
-        chapters = parse_catalog(catalog_url, selector=catalog_selector)
+        chapters = parse_catalog(catalog_url, selector=catalog_selector, url_pattern=url_pattern)
 
         if not chapters:
             task["status"] = "error"
@@ -330,12 +331,13 @@ def catalog_preview():
     data = request.get_json()
     url = data.get("url", "").strip()
     selector = data.get("selector", "").strip() or None
+    url_pattern = data.get("url_pattern", "").strip() or None
 
     if not url:
         return jsonify({"error": "請輸入目錄網址"}), 400
 
     try:
-        chapters = parse_catalog(url, selector=selector)
+        chapters = parse_catalog(url, selector=selector, url_pattern=url_pattern)
         return jsonify({
             "total": len(chapters),
             "chapters": chapters[:100],  # limit preview

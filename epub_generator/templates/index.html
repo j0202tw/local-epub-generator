@@ -245,6 +245,11 @@
                 <div class="hint">CSS 選擇器，用於精確定位目錄中的章節連結</div>
             </div>
             <div class="form-group">
+                <label>URL 過濾規則（選填）</label>
+                <input type="text" id="url-pattern" placeholder="例如：/126972/\d+">
+                <div class="hint">正則表達式，只保留 URL 符合規則的連結。範例：<code>/126972/\d+</code> 只保留該書本章節</div>
+            </div>
+            <div class="form-group">
                 <label>正文選擇器（選填）</label>
                 <input type="text" id="content-selector" placeholder="例如：#content 或 .chapter-body">
                 <div class="hint">可用下方「探測工具」找出正確的選擇器</div>
@@ -403,6 +408,7 @@ function escHtml(s) {
 document.getElementById('preview-catalog-btn').addEventListener('click', async () => {
     const url = document.getElementById('catalog-url').value.trim();
     const selector = document.getElementById('catalog-selector').value.trim();
+    const urlPattern = document.getElementById('url-pattern').value.trim();
     if (!url) { alert('請輸入目錄網址'); return; }
 
     const btn = document.getElementById('preview-catalog-btn');
@@ -413,7 +419,7 @@ document.getElementById('preview-catalog-btn').addEventListener('click', async (
         const resp = await fetch('/catalog-preview', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ url, selector }),
+            body: JSON.stringify({ url, selector, url_pattern: urlPattern }),
         });
         const data = await resp.json();
         if (data.error) { alert(data.error); return; }
@@ -442,6 +448,7 @@ document.getElementById('generate-btn').addEventListener('click', async () => {
     const author = document.getElementById('book-author').value.trim();
     const catalogUrl = document.getElementById('catalog-url').value.trim();
     const catalogSelector = document.getElementById('catalog-selector').value.trim();
+    const urlPattern = document.getElementById('url-pattern').value.trim();
     const contentSelector = document.getElementById('content-selector').value.trim();
     const maxThreads = document.getElementById('max-threads').value;
 
@@ -463,7 +470,7 @@ document.getElementById('generate-btn').addEventListener('click', async () => {
         const resp = await fetch('/generate', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ title, author, catalog_url: catalogUrl, catalog_selector: catalogSelector, content_selector: contentSelector, max_threads: parseInt(maxThreads) }),
+            body: JSON.stringify({ title, author, catalog_url: catalogUrl, catalog_selector: catalogSelector, url_pattern: urlPattern, content_selector: contentSelector, max_threads: parseInt(maxThreads) }),
         });
         const data = await resp.json();
         if (data.error) { alert(data.error); return; }
