@@ -8,3 +8,5 @@ Changelog:
 - Persisted completed task metadata to disk so downloads survive server restarts
 - Added URL pattern filter support for catalog parsing
 - Fixed chapter order sorting after parallel fetch
+- Auto-detect URL pattern from catalog preview and auto-fill input field
+- Changed download to use fetch+blob with Save As dialog instead of direct link
